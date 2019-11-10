@@ -1,12 +1,11 @@
-#ifndef ICTCP_H
-#define ICTCP_H
+#ifndef TCPICTCP_H
+#define TCPICTCP_H
 
 #include "ns3/tcp-congestion-ops.h"
-#include "ns3/tcp-recovery-ops.h"
 
 namespace ns3 {
-
-/**
+ 
+ /**
  * \ingroup congestionOps
  *
  * \brief An implementation of ICTCP
@@ -40,30 +39,30 @@ namespace ns3 {
  * Decrease is restricted to one MSS per RTT to prevent the sliding window have to shift backward.
  */
 
-class IcTcp : public TcpNewReno
-{
-public:
-  /**
+  class TcpIctcp : public TcpNewReno
+  {
+    public:
+        /**
    * \brief Get the type ID.
    * \return the object TypeId
    */
-  static TypeId GetTypeId (void);
 
-  /**
+    static TypeId GetTypeId (void);
+    /**
    * Create an unbound tcp socket.
    */
-  IcTcp (void);
 
-  /**
+    TcpIctcp (void);
+    /**
    * \brief Copy constructor
    * \param sock the object to copy
    */
-  IcTcp (const IcTcp& sock);
-  virtual ~IcTcp (void);
 
-  virtual std::string GetName () const;
+    TcpIctcp (const TcpIctcp& sock);
+    virtual ~TcpIctcp (void);
 
-  /**
+    virtual std::string GetName () const;
+    /**
    * \brief Compute RTTs needed to execute Vegas algorithm
    *
    * The function filters RTT samples from the last RTT to find
@@ -78,10 +77,9 @@ public:
    * \param rtt last RTT
    *
    */
-  virtual void PktsAcked (Ptr<TcpSocketState> tcb, uint32_t segmentsAcked,
-                          const Time& rtt);
 
-  /**
+    virtual void PktsAcked (Ptr<TcpSocketState> tcb, uint32_t segmentsAcked, const Time& rtt);
+    /**
    * \brief Enable/disable IcTcp algorithm depending on the congestion state
    *
    * We only start a Vegas cycle when we are in normal congestion state (CA_OPEN state).
@@ -89,43 +87,59 @@ public:
    * \param tcb internal congestion state
    * \param newState new congestion state to which the TCP is going to switch
    */
-  virtual void CongestionStateSet (Ptr<TcpSocketState> tcb,
-                                   const TcpSocketState::TcpCongState_t newState);
 
-  /**
+    virtual void CongestionStateSet (Ptr<TcpSocketState> tcb, const TcpSocketState::TcpCongState_t newState);
+    /**
    * \brief Adjust cwnd following IcTcp linear increase/decrease algorithm
    *
    * \param tcb internal congestion state
    * \param segmentsAcked count of segments ACKed
    */
-  virtual void IncreaseWindow (Ptr<TcpSocketState> tcb, uint32_t segmentsAcked);
 
-  
-  virtual uint32_t GetSsThresh (Ptr<const TcpSocketState> tcb,
-                                uint32_t bytesInFlight);
+    virtual void IncreaseWindow (Ptr<TcpSocketState> tcb, uint32_t segmentsAcked);
 
-  virtual Ptr<TcpCongestionOps> Fork ();
+    virtual uint32_t GetSsThresh (Ptr<const TcpSocketState> tcb, uint32_t bytesInFlight);
 
-protected:
-private:
-  /**
+     virtual void RxCongestionAvoidance (Ptr<TcpSocketState> tcb, uint32_t segmentsAcked);
+    virtual uint32_t RxSlowStart (Ptr<TcpSocketState> tcb, uint32_t segmentsAcked);
+
+    virtual Ptr<TcpCongestionOps> Fork ();
+
+  protected:
+  private:
+    /**
    * \brief Enable IcTcp algorithm to start taking IcTcp samples
    *
    * 
    *
    * \param tcb internal congestion state
    */
-  void EnableIcTcp (Ptr<TcpSocketState> tcb);
 
-  /**
+    void EnableIctcp(Ptr<TcpSocketState> tcb);
+    
+    /**
    * \brief Stop taking IcTcp samples
    */
-  void DisableIcTcp ();
+    void DisableIctcp();
 
-private:
-       
-};
+    // My code, Compute the throughput difference
+    double ComputeThroughputDiff(Ptr<const TcpSocketState> tcb); 
+  private:
+
+    // My code
+    double m_measure_thru;             //!<Measured throughput
+    uint32_t m_count;                  //!<RTT counter, at least three times diff > threshhold, go to case 2.
+    //
+    Time m_baseRtt;                    //!< Minimum of all RTT measurements seen during connection
+    Time m_minRtt;                     //!< Minimum of RTTs measured within last RTT
+    uint32_t m_cntRtt;                 //!< Number of RTT measurements during last RTT
+    bool m_doingIctcpNow;              //!< If true, do Ictcp for this RTT
+    uint32_t m_diff;                   //!< Difference between expected and actual throughput
+    bool m_inc;                        //!< If true, cwnd needs to be incremented
+    uint32_t m_ackCnt;                 //!< Number of received ACK
+    uint32_t m_beta;                   //!< Threshold for congestion detection
+  };
 
 } // namespace ns3
 
-#endif // ICTCP_H
+#endif // TCPICTCP_H
