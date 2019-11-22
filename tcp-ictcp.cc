@@ -126,19 +126,6 @@ namespace ns3 {
   std::string TcpIctcp::GetName () const {
     return "TcpIctcp";
   }
-    double TcpIctcp::ComputeBandwidth (Ptr<const TcpSocketState> tcb) {
-    // Declare
-    double alpha= 0.9;             //a value
-    double capacity_link = 100.0;   //capacity link taking it as 1gbps
-    //double BW = 0.0;       // expected throughput
-    double new_BW= 0.0;        // throughput difference
-    uint32_t curr_cwnd = 0;        // current window
-
-    new_BW = std::max (0.0, (double)(alpha*capacity_link- BW));
-    if (new_BW!=0)
-           BW=new_BW;
-    return BW;
-  }
 
   double TcpIctcp::ComputeBandwidth (Ptr<const TcpSocketState> tcb) {
     // Declare
