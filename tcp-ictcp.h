@@ -62,39 +62,29 @@ namespace ns3 {
     virtual ~TcpIctcp (void);
 
     virtual std::string GetName () const;
-    /**
-   * \brief Compute RTTs needed to execute Vegas algorithm
-   *
-   * The function filters RTT samples from the last RTT to find
-   * the current smallest propagation delay + queueing delay (minRtt).
-   * We take the minimum to avoid the effects of delayed ACKs.
-   *
-   * The function also min-filters all RTT measurements seen to find the
-   * propagation delay (baseRtt).
-   *
-   * \param tcb internal congestion state
-   * \param segmentsAcked count of segments ACKed
-   * \param rtt last RTT
-   *
-   */
 
     virtual void PktsAcked (Ptr<TcpSocketState> tcb, uint32_t segmentsAcked, const Time& rtt);
+
+
     /**
    * \brief Enable/disable IcTcp algorithm depending on the congestion state
    *
-   * We only start a Vegas cycle when we are in normal congestion state (CA_OPEN state).
+   * We only start a ICTCP cycle when we are in normal congestion state (CA_OPEN state).
    *
    * \param tcb internal congestion state
    * \param newState new congestion state to which the TCP is going to switch
    */
-
     virtual void CongestionStateSet (Ptr<TcpSocketState> tcb, const TcpSocketState::TcpCongState_t newState);
+    
+
     /**
    * \brief Adjust cwnd following IcTcp linear increase/decrease algorithm
    *
    * \param tcb internal congestion state
    * \param segmentsAcked count of segments ACKed
    */
+
+
 
     virtual void IncreaseWindow (Ptr<TcpSocketState> tcb, uint32_t segmentsAcked);
 
@@ -123,6 +113,7 @@ namespace ns3 {
     void DisableIctcp();
 
     // My code, Compute the throughput difference
+    double ComputeBandwidth(Ptr<const TcpSocketState> tcb);
     double ComputeThroughputDiff(Ptr<const TcpSocketState> tcb); 
   private:
 
@@ -138,6 +129,9 @@ namespace ns3 {
     bool m_inc;                        //!< If true, cwnd needs to be incremented
     uint32_t m_ackCnt;                 //!< Number of received ACK
     uint32_t m_beta;                   //!< Threshold for congestion detection
+    Time m_lastCon;                    //!< Time of the last congestion for the flow
+    uint32_t m_dataSent;               //!< Current amount of data sent since last congestion
+    double BW;
   };
 
 } // namespace ns3

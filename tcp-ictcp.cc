@@ -12,10 +12,6 @@ namespace ns3 {
       .SetParent<TcpNewReno> ()
       .AddConstructor<TcpIctcp> ()
       .SetGroupName ("Internet")
-      .AddAttribute ("alpha", "Current measured throughput",
-                     UintegerValue (3),
-                     MakeUintegerAccessor (&TcpIctcp::m_beta),
-                     MakeUintegerChecker<uint32_t> ())
       .AddAttribute("Count", "Decrease after three times",
                      UintegerValue(0),
                      MakeUintegerAccessor(&TcpIctcp::m_count),
@@ -35,10 +31,11 @@ namespace ns3 {
       m_minRtt (Time::Max ()),
       m_cntRtt (0),
       m_doingIctcpNow (true),
-      m_diff (0),
-      m_inc (true),
-      m_ackCnt (0),
-      m_beta (6)
+      m_lastCon (0),
+      m_dataSent (0),
+      BW(0)
+      //m_diff (0)
+      //m_ackCnt (0)
   {
     NS_LOG_FUNCTION (this);
   }
@@ -51,10 +48,11 @@ namespace ns3 {
       m_minRtt (sock.m_minRtt),
       m_cntRtt (sock.m_cntRtt),
       m_doingIctcpNow (true),
-      m_diff (0),
-      m_inc (true),
-      m_ackCnt (sock.m_ackCnt),
-      m_beta (sock.m_beta)
+      m_lastCon (sock.m_lastCon),
+      m_dataSent (sock.m_dataSent),
+      BW(sock.BW)
+      //m_diff (0)
+      //m_ackCnt (sock.m_ackCnt)
   {
     NS_LOG_FUNCTION (this);
   }
@@ -67,12 +65,20 @@ namespace ns3 {
     return CopyObject<TcpIctcp> (this);
   }
 
+
+//Standard functions
   void TcpIctcp::PktsAcked (Ptr<TcpSocketState> tcb, uint32_t segmentsAcked, const Time& rtt) {
     NS_LOG_FUNCTION (this << tcb << segmentsAcked << rtt);
 
     if (rtt.IsZero ()) {
         return;
       }
+
+      if (tcb->m_congState == TcpSocketState::CA_OPEN)
+    {
+      m_dataSent += segmentsAcked * tcb->m_segmentSize;
+    }
+
 
     m_minRtt = std::min (m_minRtt, rtt);
     NS_LOG_DEBUG ("Updated m_minRtt= " << m_minRtt);
@@ -111,24 +117,44 @@ namespace ns3 {
       }
   }
 
+//
+
+
+
   // My Code
   /////////////////////////////////////////////////////////////////////////////////////////
   std::string TcpIctcp::GetName () const {
     return "TcpIctcp";
   }
 
+  double TcpIctcp::ComputeBandwidth (Ptr<const TcpSocketState> tcb) {
+    // Declare
+    double alpha= 0.9;             //a value
+    double capacity_link = 100.0;   //capacity link taking it as 1gbps
+    //double BW = 0.0;       // expected throughput
+    double new_BW= 0.0;        // throughput difference
+    //uint32_t curr_cwnd = 0;        // current window
+
+    new_BW = std::max (0.0, (double)(alpha*capacity_link- BW));
+    if (new_BW!=0)
+           BW=new_BW;
+    return BW;
+  }
+
   double TcpIctcp::ComputeThroughputDiff (Ptr<const TcpSocketState> tcb) {
     // Declare
-    double beta = 0.5;             // exponential factor
+    double beta = 0.75;             // exponential factor (according to paper)
     double curr_thru = 0.0;        // current throughput
     double expec_thru = 0.0;       // expected throughput
     double thru_diff = 0.0;        // throughput difference
-    uint32_t curr_cwnd = 0;        // current window
+    //uint32_t curr_cwnd = 0;        // current window
 
     // Compute the throughput difference based on paper
     // Compute the current cwnd
-    curr_cwnd = tcb->GetCwndInSegments();
-    curr_thru = m_baseRtt.GetSeconds()*curr_cwnd;
+    //curr_cwnd = tcb->GetCwndInSegments();
+    //curr_thru = m_baseRtt.GetSeconds()*curr_cwnd;
+    //m_throughput
+    curr_thru= static_cast<uint32_t> (m_dataSent/ (Simulator::Now ().GetSeconds () - m_lastCon.GetSeconds ()));
 
     // Get meausred throughput
     m_measure_thru = std::max (curr_thru, beta*m_measure_thru + (1 - beta)*curr_thru);
@@ -150,17 +176,19 @@ namespace ns3 {
     // Case 1: Increase the receive window, there is enough quota
     if (thru_diff <= threshhold1 || thru_diff <= tcb->m_segmentSize / tcb->m_rWnd) { 
       if (tcb->m_rWnd < tcb->m_ssThresh) {
-      // Slow start mode. Veno employs same slow start algorithm as NewReno's.
+      // Slow start mode. ICTCP employs same slow start algorithm as NewReno's.
         NS_LOG_LOGIC ("We are in slow start, behave like NewReno.");
         segmentsAcked = RxSlowStart (tcb, segmentsAcked);
       }
       // Otherwise: Keep the window
       else { 
       // Congestion avoidance mode
-        NS_LOG_LOGIC ("We are in congestion avoidance, execute Veno additive "
+        NS_LOG_LOGIC ("We are in congestion avoidance, execute ICTCP additive "
                       "increase algo.");
+        
         RxCongestionAvoidance (tcb, segmentsAcked);
       }
+      // if thru_diff
       NS_LOG_LOGIC ("Stage1");
       TcpNewReno::IncreaseWindow (tcb, segmentsAcked);
     }
@@ -174,6 +202,9 @@ namespace ns3 {
     NS_LOG_FUNCTION (this << tcb << bytesInFlight);
       double threshhold2 = 0.5;
       double thru_diff = ComputeThroughputDiff(tcb);
+        m_lastCon = Simulator::Now ();
+      m_dataSent = 0;
+
       // Case 2: Decrease the receive window, thru_diff > threshhold2 when 3 continued RTT
       if (thru_diff > threshhold2 && m_count >= 2) {
         m_count=0;
