@@ -19,3 +19,9 @@ of ICTCP in ns-3.
 
 [2] TCP models in ns-3
 (Link: https://www.nsnam.org/docs/models/html/tcp.html#writing-a-new-congestion-control-algorithm)
+
+### Team
+
+Abha wadjikar  
+Sharmila Biswas  
+Niwedita  
